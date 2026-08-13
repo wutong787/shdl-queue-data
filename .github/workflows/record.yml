@@ -1,0 +1,37 @@
+name: record-shanghai-disney-queue
+
+on:
+  schedule:
+    # 每 5 分钟触发一次（UTC）。上海时区 07:30–22:30 的营业时段由 record.py 内部判断，
+    # 非营业时段会自动跳过，不会写入空快照。
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}   # 允许在 Actions 页面手动点一次跑
+
+permissions:
+  contents: write        # 需要写回 data/queue_times.jsonl
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch & append snapshot
+        run: python record.py
+
+      - name: Commit & push
+        run: |
+          git config user.name "queue-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/queue_times.jsonl
+          git commit -m "snapshot $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "nothing to commit"
+          git push
